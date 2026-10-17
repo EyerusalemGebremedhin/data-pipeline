@@ -1,17 +1,26 @@
 import argparse
 import logging
-import sqlite3
+import os
 import sys
 import time
 
 import requests
 
+import psycopg2
+
 API_URL = "https://api.frankfurter.dev/v1/latest"
 BASE_CURRENCY = "USD"
 TARGET_CURRENCIES = "EUR,GBP,JPY,KES"
-DB_FILE = "rates.db"
 MAX_ATTEMPTS = 3
 WAIT_SECONDS = 2
+
+DB_CONFIG = {
+    "host": os.getenv("PGHOST", "localhost"),
+    "port": os.getenv("PGPORT", "5432"),
+    "dbname": os.getenv("PGDATABASE", "rates"),
+    "user": os.getenv("PGUSER", "postgres"),
+    "password": os.getenv("PGPASSWORD", "postgres"),
+}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,27 +62,41 @@ def transform(data):
     return rows
 
 
-def load(rows, db_file=DB_FILE):
-    with sqlite3.connect(db_file) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS exchange_rates (
-                rate_date TEXT NOT NULL,
-                base      TEXT NOT NULL,
-                target    TEXT NOT NULL,
-                rate      REAL NOT NULL,
-                loaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (rate_date, base, target)
-            )
-            """
-        )
-        conn.executemany(
-            "INSERT OR REPLACE INTO exchange_rates (rate_date, base, target, rate) "
-            "VALUES (?, ?, ?, ?)",
-            rows,
-        )
-    log.info("Saved %d rows to %s", len(rows), db_file)
-    return len(rows)
+def get_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def load(rows, db_file=None):
+    conn = get_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS exchange_rates (
+                        rate_date TEXT NOT NULL,
+                        base      TEXT NOT NULL,
+                        target    TEXT NOT NULL,
+                        rate      REAL NOT NULL,
+                        loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (rate_date, base, target)
+                    )
+                    """
+                )
+                cur.executemany(
+                    """
+                    INSERT INTO exchange_rates (rate_date, base, target, rate)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (rate_date, base, target)
+                    DO UPDATE SET rate = EXCLUDED.rate,
+                                  loaded_at = CURRENT_TIMESTAMP
+                    """,
+                    rows,
+                )
+        log.info("Saved %d rows to PostgreSQL", len(rows))
+        return len(rows)
+    finally:
+        conn.close()
 
 
 def run():

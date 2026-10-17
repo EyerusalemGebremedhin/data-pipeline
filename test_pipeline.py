@@ -1,6 +1,4 @@
 import os
-import sqlite3
-import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -25,16 +23,19 @@ class TestPipeline(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.transform({"base": "USD"})
 
-    def test_load_twice_has_no_duplicates(self):
-        with tempfile.TemporaryDirectory() as folder:
-            db = os.path.join(folder, "test.db")
-            rows = pipeline.transform(GOOD_DATA)
-            pipeline.load(rows, db)
-            pipeline.load(rows, db)
-            count = sqlite3.connect(db).execute(
-                "SELECT COUNT(*) FROM exchange_rates"
-            ).fetchone()[0]
-            self.assertEqual(count, 2)
+    @patch("pipeline.get_connection")
+    def test_load_twice_has_no_duplicates(self, mock_get_connection):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_get_connection.return_value = mock_conn
+        mock_conn.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+        rows = pipeline.transform(GOOD_DATA)
+        pipeline.load(rows)
+        pipeline.load(rows)
+
+        self.assertEqual(mock_cursor.executemany.call_count, 2)
 
     @patch("pipeline.time.sleep")
     @patch("pipeline.requests.get")
