@@ -1,9 +1,3 @@
-"""Simple data pipeline: exchange rates API -> SQLite database.
-
-Steps: extract (get data) -> transform (check and clean) -> load (save).
-Run once:        python pipeline.py
-Run every day:   python pipeline.py --loop
-"""
 import argparse
 import logging
 import sqlite3
@@ -16,8 +10,8 @@ API_URL = "https://api.frankfurter.dev/v1/latest"
 BASE_CURRENCY = "USD"
 TARGET_CURRENCIES = "EUR,GBP,JPY,KES"
 DB_FILE = "rates.db"
-MAX_ATTEMPTS = 3          # how many times we try the API before giving up
-WAIT_SECONDS = 2          # wait time between tries (grows each time)
+MAX_ATTEMPTS = 3
+WAIT_SECONDS = 2
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,12 +22,11 @@ log = logging.getLogger("pipeline")
 
 
 def extract():
-    """Get the latest rates from the API. Retry if it fails."""
     params = {"base": BASE_CURRENCY, "symbols": TARGET_CURRENCIES}
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             response = requests.get(API_URL, params=params, timeout=10)
-            response.raise_for_status()  # error for 4xx and 5xx status codes
+            response.raise_for_status()
             log.info("Got data from the API (attempt %d)", attempt)
             return response.json()
         except requests.RequestException as error:
@@ -44,7 +37,6 @@ def extract():
 
 
 def transform(data):
-    """Check the data and turn it into rows: (date, base, target, rate)."""
     for key in ("date", "base", "rates"):
         if key not in data:
             raise ValueError(f"API response is missing '{key}'")
@@ -62,7 +54,6 @@ def transform(data):
 
 
 def load(rows, db_file=DB_FILE):
-    """Save the rows in the database. Running twice does not make duplicates."""
     with sqlite3.connect(db_file) as conn:
         conn.execute(
             """
@@ -86,7 +77,6 @@ def load(rows, db_file=DB_FILE):
 
 
 def run():
-    """Run the whole pipeline once."""
     try:
         data = extract()
         rows = transform(data)
