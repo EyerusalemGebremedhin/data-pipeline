@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+
+# Database and logs
+rates.db
+pipeline.log
+
+# Virtual environments
+venv/
+env/
