@@ -1,11 +1,3 @@
-"""FX data pipeline: Frankfurter API -> PostgreSQL.
-
-Steps: extract (get data) -> transform (check and clean) -> load (save).
-Run once:        python pipeline.py
-Run every day:   python pipeline.py --loop
-
-Configuration comes from environment variables (.env file), never hardcoded.
-"""
 import argparse
 import logging
 import os
@@ -19,7 +11,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API configuration
 API_URL = os.getenv("API_URL", "https://api.frankfurter.dev/v1/latest")
 API_KEY = os.getenv("API_KEY", "")
 BASE_CURRENCY = os.getenv("BASE_CURRENCY", "USD")
@@ -27,7 +18,6 @@ TARGET_CURRENCIES = os.getenv("TARGET_CURRENCIES", "EUR,GBP,JPY,KES")
 MAX_ATTEMPTS = int(os.getenv("MAX_ATTEMPTS", "3"))
 WAIT_SECONDS = int(os.getenv("WAIT_SECONDS", "2"))
 
-# Database configuration - read from environment, never hardcoded
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
     "port": os.getenv("PGPORT", "5432"),
@@ -36,7 +26,6 @@ DB_CONFIG = {
     "password": os.getenv("PGPASSWORD"),
 }
 
-# Allow DATABASE_URL to override individual settings
 database_url = os.getenv("DATABASE_URL", "")
 if database_url:
     match = re.match(r"postgresql://([^:]+):([^@]+)@([^:/]+):?([^/]*)/(.+)", database_url)
@@ -57,7 +46,6 @@ log = logging.getLogger("pipeline")
 
 
 def extract():
-    """Get latest exchange rates from the API with retries."""
     params = {"base": BASE_CURRENCY, "symbols": TARGET_CURRENCIES}
     headers = {}
     if API_KEY:
@@ -77,7 +65,6 @@ def extract():
 
 
 def transform(data):
-    """Validate API response and convert to (date, base, target, rate) rows."""
     for key in ("date", "base", "rates"):
         if key not in data:
             raise ValueError(f"API response is missing '{key}'")
@@ -95,12 +82,10 @@ def transform(data):
 
 
 def get_connection():
-    """Open a PostgreSQL connection using environment config."""
     return psycopg2.connect(**DB_CONFIG)
 
 
 def load(rows, db_file=None):
-    """Save rows to PostgreSQL. Idempotent: upserts on conflict."""
     conn = get_connection()
     try:
         with conn:
@@ -134,7 +119,6 @@ def load(rows, db_file=None):
 
 
 def run():
-    """Run the full pipeline once: extract, transform, load."""
     try:
         data = extract()
         rows = transform(data)
