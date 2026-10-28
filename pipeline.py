@@ -20,7 +20,7 @@ WAIT_SECONDS = int(os.getenv("WAIT_SECONDS", "2"))
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
     "port": os.getenv("PGPORT", "5432"),
-    "dbname": os.getenv("PGDATABASE", "rates"),
+    "dbname": os.getenv("PGDATABASE", "pipeline"),
     "user": os.getenv("PGUSER", "postgres"),
     "password": os.getenv("PGPASSWORD", "postgres"),
 }
