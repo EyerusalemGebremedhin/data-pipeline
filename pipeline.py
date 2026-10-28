@@ -5,14 +5,17 @@ import sys
 import time
 
 import requests
-
 import psycopg2
+from dotenv import load_dotenv
 
-API_URL = "https://api.frankfurter.dev/v1/latest"
-BASE_CURRENCY = "USD"
-TARGET_CURRENCIES = "EUR,GBP,JPY,KES"
-MAX_ATTEMPTS = 3
-WAIT_SECONDS = 2
+load_dotenv()
+
+API_URL = os.getenv("API_URL", "https://api.frankfurter.dev/v1/latest")
+API_KEY = os.getenv("API_KEY", "")
+BASE_CURRENCY = os.getenv("BASE_CURRENCY", "USD")
+TARGET_CURRENCIES = os.getenv("TARGET_CURRENCIES", "EUR,GBP,JPY,KES")
+MAX_ATTEMPTS = int(os.getenv("MAX_ATTEMPTS", "3"))
+WAIT_SECONDS = int(os.getenv("WAIT_SECONDS", "2"))
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
@@ -32,9 +35,12 @@ log = logging.getLogger("pipeline")
 
 def extract():
     params = {"base": BASE_CURRENCY, "symbols": TARGET_CURRENCIES}
+    headers = {}
+    if API_KEY:
+        headers["Authorization"] = f"Bearer {API_KEY}"
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            response = requests.get(API_URL, params=params, timeout=10)
+            response = requests.get(API_URL, params=params, headers=headers, timeout=10)
             response.raise_for_status()
             log.info("Got data from the API (attempt %d)", attempt)
             return response.json()
