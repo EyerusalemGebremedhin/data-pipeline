@@ -20,10 +20,22 @@ WAIT_SECONDS = int(os.getenv("WAIT_SECONDS", "2"))
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
     "port": os.getenv("PGPORT", "5432"),
-    "dbname": os.getenv("PGDATABASE", "pipeline"),
+    "dbname": os.getenv("PGDATABASE", "rica"),
     "user": os.getenv("PGUSER", "postgres"),
     "password": os.getenv("PGPASSWORD", "postgres"),
 }
+
+# Override from DATABASE_URL if provided
+database_url = os.getenv("DATABASE_URL", "")
+if database_url:
+    # Format: postgresql://user:password@host/dbname
+    import re
+    match = re.match(r"postgresql://([^:]+):([^@]+)@([^/]+)/(.+)", database_url)
+    if match:
+        DB_CONFIG["user"] = match.group(1)
+        DB_CONFIG["password"] = match.group(2)
+        DB_CONFIG["host"] = match.group(3)
+        DB_CONFIG["dbname"] = match.group(4)
 
 logging.basicConfig(
     level=logging.INFO,
